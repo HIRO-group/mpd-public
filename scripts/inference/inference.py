@@ -24,6 +24,7 @@ from torch_robotics.torch_utils.torch_utils import get_torch_device, freeze_torc
 from torch_robotics.trajectory.metrics import compute_smoothness, compute_path_length, compute_variance_waypoints
 from torch_robotics.trajectory.utils import interpolate_traj_via_points
 from torch_robotics.visualizers.planning_visualizer import PlanningVisualizer
+import pdb
 
 allow_ops_in_compiled_graph()
 
@@ -76,8 +77,7 @@ def experiment(
 ):
     ########################################################################################################################
     fix_random_seed(seed)
-
-    device = get_torch_device(device)
+    device = torch.device(type=device, index=1)
     tensor_args = {'device': device, 'dtype': torch.float32}
 
     ########################################################################################################################
