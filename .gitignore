@@ -178,3 +178,6 @@ data_trajectories
 *.pickle
 
 *tar.gz
+
+# vscode
+.vscode/

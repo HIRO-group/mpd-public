@@ -23,8 +23,8 @@ hostname = socket.gethostname()
 
 LOCAL = is_local()
 TEST = False
-# USE_CUDA = True
-USE_CUDA = False
+USE_CUDA = True
+# USE_CUDA = False
 
 N_SEEDS = num_contexts
 
@@ -34,7 +34,7 @@ N_EXPS_IN_PARALLEL = 15 if not USE_CUDA else 1
 N_CORES = 8
 MEMORY_SINGLE_JOB = 12000
 MEMORY_PER_CORE = N_EXPS_IN_PARALLEL * MEMORY_SINGLE_JOB // N_CORES
-PARTITION = 'gpu' if USE_CUDA else 'amd3,amd2,amd'
+PARTITION = 'gpu:1' if USE_CUDA else 'amd3,amd2,amd'
 GRES = 'gpu:1' if USE_CUDA else None  # gpu:rtx2080:1, gpu:rtx3080:1, gpu:rtx3090:1, gpu:a5000:1
 CONDA_ENV = 'mpd-public'
 
@@ -73,7 +73,7 @@ launcher.add_experiment(
     threshold_start_goal_pos=threshold_start_goal_pos,
     obstacle_cutoff_margin=obstacle_cutoff_margin,
 
-    device='cuda' if USE_CUDA else 'cpu',
+    device='cuda:1' if USE_CUDA else 'cpu',
 
     debug=False
 )
