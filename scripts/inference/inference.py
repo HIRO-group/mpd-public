@@ -24,8 +24,6 @@ from torch_robotics.torch_utils.torch_utils import get_torch_device, freeze_torc
 from torch_robotics.trajectory.metrics import compute_smoothness, compute_path_length, compute_variance_waypoints
 from torch_robotics.trajectory.utils import interpolate_traj_via_points
 from torch_robotics.visualizers.planning_visualizer import PlanningVisualizer
-from torch_robotics.environments import EnvYaml
-from torch_robotics.tasks.tasks import PlanningTask
 import pdb
 
 allow_ops_in_compiled_graph()
@@ -115,15 +113,9 @@ def experiment(
     )
     dataset = train_subset.dataset
     n_support_points = dataset.n_support_points
-    yaml_file = "/home/gilberto/mpd-public/deps/torch_robotics/torch_robotics/environments/env_descriptions/env_anuj.yaml"
-    env = EnvYaml(tensor_args=tensor_args, yaml_file=yaml_file)
-    robot = RobotPanda(**args, tensor_args=tensor_args)
-    task = PlanningTask(env=env, robot=robot, **args, tensor_args=tensor_args)
-    # env = dataset.env
-    # robot = dataset.robot
-    # task = dataset.task
-    
-    # pdb.set_trace()
+    env = dataset.env
+    robot = dataset.robot
+    task = dataset.task
 
     dt = trajectory_duration / n_support_points  # time interval for finite differences
 
@@ -178,9 +170,6 @@ def experiment(
                          f"start_state_pos: {start_state_pos}\n"
                          f"goal_state_pos:  {goal_state_pos}\n")
 
-    start_state_pos = torch.tensor([0, -0.785, 0, -2.356, 0, 1.571, 0.785], device=device)
-    goal_state_pos = torch.tensor([-1.451, -0.951, 2.419, -1.139, -2.647, 2.824, 0.886], device=device)
-   
     print(f'start_state_pos: {start_state_pos}')
     print(f'goal_state_pos: {goal_state_pos}')
 
