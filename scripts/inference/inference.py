@@ -25,6 +25,8 @@ from torch_robotics.trajectory.metrics import compute_smoothness, compute_path_l
 from torch_robotics.trajectory.utils import interpolate_traj_via_points
 from torch_robotics.visualizers.planning_visualizer import PlanningVisualizer
 import pdb
+from torch_robotics.environments import EnvYaml
+from torch_robotics.tasks.tasks import PlanningTask
 
 allow_ops_in_compiled_graph()
 
@@ -116,6 +118,11 @@ def experiment(
     env = dataset.env
     robot = dataset.robot
     task = dataset.task
+    # pdb.set_trace()
+    yaml_file = "/home/gilberto/mpd-public/deps/torch_robotics/torch_robotics/environments/env_descriptions/env_anuj.yaml"
+    env = EnvYaml(tensor_args=tensor_args, yaml_file=yaml_file, **args)
+    robot = RobotPanda(tensor_args=tensor_args, **args)
+    task = PlanningTask(env = env, robot = robot, tensor_args=tensor_args, **args)
 
     dt = trajectory_duration / n_support_points  # time interval for finite differences
 
@@ -170,6 +177,16 @@ def experiment(
                          f"start_state_pos: {start_state_pos}\n"
                          f"goal_state_pos:  {goal_state_pos}\n")
 
+    start_state_pos = torch.tensor([0, -0.785, 0, -2.356, 0, 1.571, 0.785], **tensor_args).unsqueeze(0)
+    goal_state_pos = torch.tensor([-1.4511, -0.9510, 2.419, -1.139, -2.647, 2.8245, 0.8869], **tensor_args).unsqueeze(0)
+    
+    # check that start and goal states are collision free
+    if any(task.compute_collision(start_state_pos)):
+        raise ValueError(f"start_state_pos is in collision\n{start_state_pos}")
+    if any(task.compute_collision(goal_state_pos)):
+        # pdb.set_trace()
+        raise ValueError(f"goal_state_pos is in collision\n{goal_state_pos}")
+    
     print(f'start_state_pos: {start_state_pos}')
     print(f'goal_state_pos: {goal_state_pos}')
 
@@ -372,6 +389,9 @@ def experiment(
             n_frames=max((2, len(trajs_iters))),
             anim_time=5
         )
+        
+        # print video file path
+        print(f'Video file path: {os.path.join(results_dir, f"{base_file_name}-joint-space-opt-iters.mp4")}')
 
         if isinstance(robot, RobotPanda):
             # visualize in Isaac Gym
