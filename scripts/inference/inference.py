@@ -119,7 +119,8 @@ def experiment(
     robot = dataset.robot
     task = dataset.task
     # pdb.set_trace()
-    yaml_file = os.path.expanduser("~") + "/mpd-public/deps/torch_robotics/torch_robotics/environments/env_descriptions/env_anuj.yaml"
+    # yaml_file = os.path.expanduser("~") + "/mpd-public/deps/torch_robotics/torch_robotics/environments/env_descriptions/env_anuj.yaml"
+    yaml_file = os.path.expanduser("~") + "/mpd-public/deps/torch_robotics/torch_robotics/environments/env_descriptions/env_shelf.yaml"
     env = EnvYaml(tensor_args=tensor_args, yaml_file=yaml_file, **args)
     robot = RobotPanda(tensor_args=tensor_args, **args)
     task = PlanningTask(env = env, robot = robot, tensor_args=tensor_args, **args)
@@ -177,8 +178,12 @@ def experiment(
                          f"start_state_pos: {start_state_pos}\n"
                          f"goal_state_pos:  {goal_state_pos}\n")
 
+    # table
+    # start_state_pos = torch.tensor([0, -0.785, 0, -2.356, 0, 1.571, 0.785], **tensor_args).unsqueeze(0)
+    # goal_state_pos = torch.tensor([-1.4511, -0.9510, 2.419, -1.139, -2.647, 2.8245, 0.8869], **tensor_args).unsqueeze(0)
+    # shelf
     start_state_pos = torch.tensor([0, -0.785, 0, -2.356, 0, 1.571, 0.785], **tensor_args).unsqueeze(0)
-    goal_state_pos = torch.tensor([-1.4511, -0.9510, 2.419, -1.139, -2.647, 2.8245, 0.8869], **tensor_args).unsqueeze(0)
+    goal_state_pos = torch.tensor([0.8760, 1.0825, -0.72523, -2.222, -2.8754, 1.7249, 1.3907], **tensor_args).unsqueeze(0)
     
     # check that start and goal states are collision free
     if any(task.compute_collision(start_state_pos)):
