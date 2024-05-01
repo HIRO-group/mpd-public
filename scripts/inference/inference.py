@@ -32,6 +32,10 @@ allow_ops_in_compiled_graph()
 
 
 TRAINED_MODELS_DIR = '../../data_trained_models/'
+ENV_NAME = "env_table"
+REQ_NUM = "0001"
+ENV_YAML = os.path.expanduser("~") + "/mpd-public/deps/torch_robotics/torch_robotics/environments/env_descriptions/"+ENV_NAME+"/"+ENV_NAME+".yaml"
+REQ_YAML = os.path.expanduser("~") + "/mpd-public/deps/torch_robotics/torch_robotics/environments/env_descriptions/"+ENV_NAME+"/request"+REQ_NUM+".yaml"
 
 
 @single_experiment_yaml
@@ -120,10 +124,10 @@ def experiment(
     task = dataset.task
     # pdb.set_trace()
     # yaml_file = os.path.expanduser("~") + "/mpd-public/deps/torch_robotics/torch_robotics/environments/env_descriptions/env_anuj.yaml"
-    yaml_file = os.path.expanduser("~") + "/mpd-public/deps/torch_robotics/torch_robotics/environments/env_descriptions/env_shelf.yaml"
-    env = EnvYaml(tensor_args=tensor_args, yaml_file=yaml_file, **args)
-    robot = RobotPanda(tensor_args=tensor_args, **args)
-    task = PlanningTask(env = env, robot = robot, tensor_args=tensor_args, **args)
+    # yaml_file = os.path.expanduser("~") + "/mpd-public/deps/torch_robotics/torch_robotics/environments/env_descriptions/env_shelf.yaml"
+    # env = EnvYaml(tensor_args=tensor_args, yaml_file=yaml_file, **args)
+    # robot = RobotPanda(tensor_args=tensor_args, **args)
+    # task = PlanningTask(env = env, robot = robot, tensor_args=tensor_args, **args)
 
     dt = trajectory_duration / n_support_points  # time interval for finite differences
 
@@ -182,8 +186,8 @@ def experiment(
     # start_state_pos = torch.tensor([0, -0.785, 0, -2.356, 0, 1.571, 0.785], **tensor_args).unsqueeze(0)
     # goal_state_pos = torch.tensor([-1.4511, -0.9510, 2.419, -1.139, -2.647, 2.8245, 0.8869], **tensor_args).unsqueeze(0)
     # shelf
-    start_state_pos = torch.tensor([0, -0.785, 0, -2.356, 0, 1.571, 0.785], **tensor_args).unsqueeze(0)
-    goal_state_pos = torch.tensor([0.8760, 1.0825, -0.72523, -2.222, -2.8754, 1.7249, 1.3907], **tensor_args).unsqueeze(0)
+    # start_state_pos = torch.tensor([0, -0.785, 0, -2.356, 0, 1.571, 0.785], **tensor_args).unsqueeze(0)
+    # goal_state_pos = torch.tensor([0.8760, 1.0825, -0.72523, -2.222, -2.8754, 1.7249, 1.3907], **tensor_args).unsqueeze(0)
     
     # check that start and goal states are collision free
     if any(task.compute_collision(start_state_pos)):

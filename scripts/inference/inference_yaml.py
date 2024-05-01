@@ -29,12 +29,16 @@ from torch_robotics.environments import EnvYaml
 from torch_robotics.tasks.tasks import PlanningTask
 import yaml
 import argparse
+import numpy as np
+
+from curobo.types.base import TensorDeviceType
+from curobo.wrap.model.robot_world import RobotWorld, RobotWorldConfig
 
 allow_ops_in_compiled_graph()
 
 
 TRAINED_MODELS_DIR = '../../data_trained_models/'
-ENV_NAME = "env_table"
+ENV_NAME = "env_shelf"
 REQ_NUM = "0001"
 ENV_YAML = os.path.expanduser("~") + "/mpd-public/deps/torch_robotics/torch_robotics/environments/env_descriptions/"+ENV_NAME+"/"+ENV_NAME+".yaml"
 REQ_YAML = os.path.expanduser("~") + "/mpd-public/deps/torch_robotics/torch_robotics/environments/env_descriptions/"+ENV_NAME+"/request"+REQ_NUM+".yaml"
@@ -131,6 +135,14 @@ def experiment(
     robot = RobotPanda(tensor_args=tensor_args, **args)
     task = PlanningTask(env = env, robot = robot, tensor_args=tensor_args, **args)
 
+    # Setup Curobo
+    robot_file = "franka.yml"
+    world_file = "collision_bookshelf.yml"
+    config = RobotWorldConfig.load_from_config(
+        robot_file, world_file, collision_activation_distance=0.05, tensor_args=TensorDeviceType(device=torch.device('cuda:1'))
+    )
+    curobo_fn = RobotWorld(config)
+
     dt = trajectory_duration / n_support_points  # time interval for finite differences
 
     # set robot's dt
@@ -169,20 +181,20 @@ def experiment(
 
     ########################################################################################################################
     # Random initial and final positions
-    n_tries = 100
-    start_state_pos, goal_state_pos = None, None
-    for _ in range(n_tries):
-        q_free = task.random_coll_free_q(n_samples=2)
-        start_state_pos = q_free[0]
-        goal_state_pos = q_free[1]
+    # n_tries = 100
+    # start_state_pos, goal_state_pos = None, None
+    # for _ in range(n_tries):
+    #     q_free = task.random_coll_free_q(n_samples=2)
+    #     start_state_pos = q_free[0]
+    #     goal_state_pos = q_free[1]
 
-        if torch.linalg.norm(start_state_pos - goal_state_pos) > dataset.threshold_start_goal_pos:
-            break
+    #     if torch.linalg.norm(start_state_pos - goal_state_pos) > dataset.threshold_start_goal_pos:
+    #         break
 
-    if start_state_pos is None or goal_state_pos is None:
-        raise ValueError(f"No collision free configuration was found\n"
-                         f"start_state_pos: {start_state_pos}\n"
-                         f"goal_state_pos:  {goal_state_pos}\n")
+    # if start_state_pos is None or goal_state_pos is None:
+    #     raise ValueError(f"No collision free configuration was found\n"
+    #                      f"start_state_pos: {start_state_pos}\n"
+    #                      f"goal_state_pos:  {goal_state_pos}\n")
 
     # table
     # start_state_pos = torch.tensor([0, -0.785, 0, -2.356, 0, 1.571, 0.785], **tensor_args).unsqueeze(0)
@@ -195,11 +207,11 @@ def experiment(
     # goal_state_pos = torch.tensor([0.8760, 1.0825, -0.72523, -2.222, -2.8754, 1.7249, 1.3907], **tensor_args).unsqueeze(0)
     
     # check that start and goal states are collision free
-    if any(task.compute_collision(start_state_pos)):
-        raise ValueError(f"start_state_pos is in collision\n{start_state_pos}")
-    if any(task.compute_collision(goal_state_pos)):
-        # pdb.set_trace()
-        raise ValueError(f"goal_state_pos is in collision\n{goal_state_pos}")
+    # if any(task.compute_collision(start_state_pos)):
+    #     raise ValueError(f"start_state_pos is in collision\n{start_state_pos}")
+    # if any(task.compute_collision(goal_state_pos)):
+    #     # pdb.set_trace()
+    #     raise ValueError(f"goal_state_pos is in collision\n{goal_state_pos}")
     
     print(f'start_state_pos: {start_state_pos}')
     print(f'goal_state_pos: {goal_state_pos}')
@@ -229,6 +241,7 @@ def experiment(
                 robot, n_support_points,
                 field=collision_field,
                 sigma_coll=1.0,
+                curobo_fn=curobo_fn,
                 tensor_args=tensor_args
             )
         )
@@ -316,67 +329,70 @@ def experiment(
     trajs_iters = dataset.unnormalize_trajectories(trajs_normalized_iters)
 
     trajs_final = trajs_iters[-1]
-    trajs_final_coll, trajs_final_coll_idxs, trajs_final_free, trajs_final_free_idxs, _ = task.get_trajs_collision_and_free(trajs_final, return_indices=True)
+    traj_all = trajs_final.cpu().detach().numpy()
+    # save trajectories
+    np.save('all_trajs.npy', traj_all)
+    # trajs_final_coll, trajs_final_coll_idxs, trajs_final_free, trajs_final_free_idxs, _ = task.get_trajs_collision_and_free(trajs_final, return_indices=True)
 
     ########################################################################################################################
     # Compute motion planning metrics
-    print(f'\n----------------METRICS----------------')
-    print(f't_total: {t_total:.3f} sec')
+    # print(f'\n----------------METRICS----------------')
+    # print(f't_total: {t_total:.3f} sec')
 
-    success_free_trajs = task.compute_success_free_trajs(trajs_final)
-    fraction_free_trajs = task.compute_fraction_free_trajs(trajs_final)
-    collision_intensity_trajs = task.compute_collision_intensity_trajs(trajs_final)
+    # success_free_trajs = task.compute_success_free_trajs(trajs_final)
+    # fraction_free_trajs = task.compute_fraction_free_trajs(trajs_final)
+    # collision_intensity_trajs = task.compute_collision_intensity_trajs(trajs_final)
 
-    print(f'success: {success_free_trajs}')
-    print(f'percentage free trajs: {fraction_free_trajs*100:.2f}')
-    print(f'percentage collision intensity: {collision_intensity_trajs*100:.2f}')
+    # print(f'success: {success_free_trajs}')
+    # print(f'percentage free trajs: {fraction_free_trajs*100:.2f}')
+    # print(f'percentage collision intensity: {collision_intensity_trajs*100:.2f}')
 
-    # compute costs only on collision-free trajectories
-    traj_final_free_best = None
-    idx_best_traj = None
-    cost_best_free_traj = None
-    cost_smoothness = None
-    cost_path_length = None
-    cost_all = None
-    variance_waypoint_trajs_final_free = None
-    if trajs_final_free is not None:
-        cost_smoothness = compute_smoothness(trajs_final_free, robot)
-        print(f'cost smoothness: {cost_smoothness.mean():.4f}, {cost_smoothness.std():.4f}')
+    # # compute costs only on collision-free trajectories
+    # traj_final_free_best = None
+    # idx_best_traj = None
+    # cost_best_free_traj = None
+    # cost_smoothness = None
+    # cost_path_length = None
+    # cost_all = None
+    # variance_waypoint_trajs_final_free = None
+    # if trajs_final_free is not None:
+    #     cost_smoothness = compute_smoothness(trajs_final_free, robot)
+    #     print(f'cost smoothness: {cost_smoothness.mean():.4f}, {cost_smoothness.std():.4f}')
 
-        cost_path_length = compute_path_length(trajs_final_free, robot)
-        print(f'cost path length: {cost_path_length.mean():.4f}, {cost_path_length.std():.4f}')
+    #     cost_path_length = compute_path_length(trajs_final_free, robot)
+    #     print(f'cost path length: {cost_path_length.mean():.4f}, {cost_path_length.std():.4f}')
 
-        # compute best trajectory
-        cost_all = cost_path_length + cost_smoothness
-        idx_best_traj = torch.argmin(cost_all).item()
-        traj_final_free_best = trajs_final_free[idx_best_traj]
-        cost_best_free_traj = torch.min(cost_all).item()
-        print(f'cost best: {cost_best_free_traj:.3f}')
+    #     # compute best trajectory
+    #     cost_all = cost_path_length + cost_smoothness
+    #     idx_best_traj = torch.argmin(cost_all).item()
+    #     traj_final_free_best = trajs_final_free[idx_best_traj]
+    #     cost_best_free_traj = torch.min(cost_all).item()
+    #     print(f'cost best: {cost_best_free_traj:.3f}')
 
-        # variance of waypoints
-        variance_waypoint_trajs_final_free = compute_variance_waypoints(trajs_final_free, robot)
-        print(f'variance waypoint: {variance_waypoint_trajs_final_free:.4f}')
+    #     # variance of waypoints
+    #     variance_waypoint_trajs_final_free = compute_variance_waypoints(trajs_final_free, robot)
+    #     print(f'variance waypoint: {variance_waypoint_trajs_final_free:.4f}')
 
-    print(f'\n--------------------------------------\n')
+    # print(f'\n--------------------------------------\n')
 
     ########################################################################################################################
     # Save data
     results_data_dict = {
         'trajs_iters': trajs_iters,
-        'trajs_final_coll': trajs_final_coll,
-        'trajs_final_coll_idxs': trajs_final_coll_idxs,
-        'trajs_final_free': trajs_final_free,
-        'trajs_final_free_idxs': trajs_final_free_idxs,
-        'success_free_trajs': success_free_trajs,
-        'fraction_free_trajs': fraction_free_trajs,
-        'collision_intensity_trajs': collision_intensity_trajs,
-        'idx_best_traj': idx_best_traj,
-        'traj_final_free_best': traj_final_free_best,
-        'cost_best_free_traj': cost_best_free_traj,
-        'cost_path_length_trajs_final_free': cost_smoothness,
-        'cost_smoothness_trajs_final_free': cost_path_length,
-        'cost_all_trajs_final_free': cost_all,
-        'variance_waypoint_trajs_final_free': variance_waypoint_trajs_final_free,
+        # 'trajs_final_coll': trajs_final_coll,
+        # 'trajs_final_coll_idxs': trajs_final_coll_idxs,
+        # 'trajs_final_free': trajs_final_free,
+        # 'trajs_final_free_idxs': trajs_final_free_idxs,
+        # 'success_free_trajs': success_free_trajs,
+        # 'fraction_free_trajs': fraction_free_trajs,
+        # 'collision_intensity_trajs': collision_intensity_trajs,
+        # 'idx_best_traj': idx_best_traj,
+        # 'traj_final_free_best': traj_final_free_best,
+        # 'cost_best_free_traj': cost_best_free_traj,
+        # 'cost_path_length_trajs_final_free': cost_smoothness,
+        # 'cost_smoothness_trajs_final_free': cost_path_length,
+        # 'cost_all_trajs_final_free': cost_all,
+        # 'variance_waypoint_trajs_final_free': variance_waypoint_trajs_final_free,
         't_total': t_total
     }
     with open(os.path.join(results_dir, 'results_data_dict.pickle'), 'wb') as handle:
@@ -398,7 +414,7 @@ def experiment(
             trajs=trajs_iters,
             pos_start_state=start_state_pos, pos_goal_state=goal_state_pos,
             vel_start_state=torch.zeros_like(start_state_pos), vel_goal_state=torch.zeros_like(goal_state_pos),
-            traj_best=traj_final_free_best,
+            traj_best=trajs_final[0],
             video_filepath=os.path.join(results_dir, f'{base_file_name}-joint-space-opt-iters.mp4'),
             n_frames=max((2, len(trajs_iters))),
             anim_time=5
@@ -414,8 +430,8 @@ def experiment(
             n_first_steps = 10
             n_last_steps = 10
 
-            trajs_pos = robot.get_position(trajs_final_free).movedim(1, 0)
-            trajs_vel = robot.get_velocity(trajs_final_free).movedim(1, 0)
+            trajs_pos = robot.get_position(trajs_final).movedim(1, 0)
+            trajs_vel = robot.get_velocity(trajs_final).movedim(1, 0)
 
             trajs_pos = interpolate_traj_via_points(trajs_pos.movedim(0, 1), 2).movedim(1, 0)
 
@@ -450,7 +466,7 @@ def experiment(
             # visualize in the planning environment
             planner_visualizer.animate_opt_iters_robots(
                 trajs=pos_trajs_iters, start_state=start_state_pos, goal_state=goal_state_pos,
-                traj_best=traj_final_free_best,
+                traj_best=trajs_final[0],
                 video_filepath=os.path.join(results_dir, f'{base_file_name}-traj-opt-iters.mp4'),
                 n_frames=max((2, len(trajs_iters))),
                 anim_time=5
