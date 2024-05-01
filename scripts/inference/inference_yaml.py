@@ -65,7 +65,7 @@ def experiment(
     n_guide_steps: int = 5,
     n_diffusion_steps_without_noise: int = 5,
 
-    weight_grad_cost_collision: float = 1e-2,
+    weight_grad_cost_collision: float = 0.1,
     weight_grad_cost_smoothness: float = 1e-7,
 
     factor_num_interpolated_points_for_collision: float = 1.5,
