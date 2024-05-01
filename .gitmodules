@@ -3,10 +3,10 @@
 	url = https://git.ias.informatik.tu-darmstadt.de/common/experiment_launcher.git
 [submodule "deps/motion_planning_baselines"]
 	path = deps/motion_planning_baselines
-	url = https://github.com/anindex/motion_planning_baselines.git
+	url = https://github.com/HIRO-group/motion_planning_baselines.git
 [submodule "deps/torch_robotics"]
 	path = deps/torch_robotics
-	url = https://github.com/anindex/torch_robotics.git
+	url = https://github.com/HIRO-group/torch_robotics.git
 [submodule "deps/storm"]
 	path = deps/storm
 	url = https://github.com/jacarvalho/storm.git
