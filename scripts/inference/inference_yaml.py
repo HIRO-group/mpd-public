@@ -89,7 +89,14 @@ def experiment(
 ):
     ########################################################################################################################
     fix_random_seed(seed)
-    device = torch.device(type=device, index=1)
+    device_count = torch.cuda.device_count()
+    if device_count == 1:
+        device_name = 'cuda'
+        idx = 0
+    elif device_count > 1:
+        device_name = 'cuda:1'
+        idx = 1
+    device = torch.device(type='cuda', index=idx)
     tensor_args = {'device': device, 'dtype': torch.float32}
 
     ########################################################################################################################
@@ -139,7 +146,7 @@ def experiment(
     robot_file = "franka.yml"
     world_file = "collision_bookshelf.yml"
     config = RobotWorldConfig.load_from_config(
-        robot_file, world_file, collision_activation_distance=0.05, tensor_args=TensorDeviceType(device=torch.device('cuda:1'))
+        robot_file, world_file, collision_activation_distance=0.05, tensor_args=TensorDeviceType(device=torch.device(device_name))
     )
     curobo_fn = RobotWorld(config)
 
