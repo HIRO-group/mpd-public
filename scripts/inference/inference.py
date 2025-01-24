@@ -122,7 +122,7 @@ def experiment(
     env = dataset.env
     robot = dataset.robot
     task = dataset.task
-    # pdb.set_trace()
+    breakpoint()
     # yaml_file = os.path.expanduser("~") + "/mpd-public/deps/torch_robotics/torch_robotics/environments/env_descriptions/env_anuj.yaml"
     # yaml_file = os.path.expanduser("~") + "/mpd-public/deps/torch_robotics/torch_robotics/environments/env_descriptions/env_shelf.yaml"
     # env = EnvYaml(tensor_args=tensor_args, yaml_file=yaml_file, **args)

@@ -16,10 +16,10 @@ class BodyNet(nn.Module):
         self.net.to(device)
         self.detokenizer.to(device)
     
-    def forward(self, x):
-        x = self.tokenizer(x)
-        x = self.net(x)
-        x = self.detokenizer(x)
+    def forward(self, x, time, context):
+        x = self.tokenizer(x)  # Tokenize input
+        x = self.net(x, time, context)  # Pass through BodyTransformer
+        x = self.detokenizer(x)  # Detokenize to original shape
         return x
     
     def mode(self, x):
