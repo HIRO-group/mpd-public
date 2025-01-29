@@ -31,7 +31,7 @@ def experiment(
     predict_epsilon: bool = True,
 
     # BodyNet
-    embedding_dim: int = 32,
+    embedding_dim: int = 36, # this must be divisible by nhead
     dim_feedforward: int = 256,
     nhead: int = 6,
     nlayers: int = 6,
@@ -58,7 +58,7 @@ def experiment(
     ########################################################################
     device: str = 'cuda',
 
-    debug: bool = True,
+    debug: bool = False,
 
     ########################################################################
     # MANDATORY

@@ -3,6 +3,7 @@ import numpy as np
 import torch
 from .mappings import Mapping
 import einops
+from mpd.models.layers.layers import TimeEncoder
 
 import torch.nn as nn
 
@@ -41,54 +42,65 @@ class tokenizer(nn.Module):
         Forward pass of the tokenizer module.
         
         Args:
-            x (torch.Tensor): Input data.
+            x (torch.Tensor): Input data of shape (batch_size, time_steps, state_dim).
         
         Returns:
-            torch.Tensor: Tokens representing the input data.
+            torch.Tensor: Tokens with shape (batch_size, time_steps, nbodies, token_dim).
         """
-        # Reshape input to match `[batch, horizon, state_dim]`
-        x = einops.rearrange(x, 'b h d -> b (h d)')
+        # Create a dictionary of mapped observations
         x = self.mapping.create_observation(x)
+        
+        # Process tokens for each body part
         tokens = []
         for key in x.keys():
-            inputs = x[key].to(self.device)
+            inputs = x[key].to(self.device)  # Shape: (batch_size, time_steps, mapped_dim)
+            
             if inputs.shape[-1] == 0:
-                tokens.append(self.zero_token.expand(*inputs.shape[:-1], -1).unsqueeze(1))
+                # If no inputs, use zero tokens
+                tokens.append(
+                    self.zero_token.expand(*inputs.shape[:-1], -1).unsqueeze(2)
+                )  # Add nbodies dimension
             else:
-                tokens.append(self.tokenizers[key](inputs).unsqueeze(1))
-        tokens = torch.cat(tokens, dim=1)
+                # Tokenize the inputs for this body
+                tokens.append(
+                    self.tokenizers[key](inputs).unsqueeze(2)
+                )  # Add nbodies dimension
+        
+        # Concatenate along the nbodies dimension
+        tokens = torch.cat(tokens, dim=2)  # Shape: (batch_size, time_steps, nbodies, token_dim)
         return tokens
 
 
 class detokenizer(nn.Module):
-    def __init__(self, env_name, embedding_dim, action_dim, num_layers=1, global_input=False, output_activation=None, device='cuda'):
+    def __init__(self, env_name, embedding_dim, action_dim, n_points_in_traj=64, num_layers=1, global_input=False, output_activation=None, device='cuda'):
         """
-        Detokenizer module for transforming tokens back into output data.
+        Detokenizer module for reconstructing the original input format.
         
         Args:
             env_name (str): Name of the environment.
             embedding_dim (int): Dimension of the token embeddings.
             action_dim (int): Dimension of the output action.
-            num_layers (int, optional): Number of layers in the detokenizer. Defaults to 1.
+            n_points_in_traj (int): Number of trajectory points (time steps).
+            num_layers (int, optional): Number of layers. Defaults to 1.
             global_input (bool, optional): Whether to use a global input for detokenization. Defaults to False.
             output_activation (nn.Module, optional): Activation function applied to the output action. Defaults to None.
-            device (str, optional): Device to use for computation. Defaults to 'cuda'.
+            device (str, optional): Device for computation. Defaults to 'cuda'.
         """
         super(detokenizer, self).__init__()
         
+        self.n_points_in_traj = n_points_in_traj  # 64 time steps
         self.mapping = Mapping(env_name)
         self.map = self.mapping.get_map()
         
-        self.nbodies = len(self.map.keys())
-        
-        self.embedding_dim = embedding_dim 
-        self.action_dim = action_dim
-        self.ouptut_activation = output_activation
-        
+        self.nbodies = len(self.map.keys())  # Number of parts (1 for point robot, 7 for Panda)
+        self.embedding_dim = embedding_dim  
+        self.action_dim = action_dim  # Should match `state_dim = 4`
+        self.output_activation = output_activation
         self.device = device
         
-        base = lambda input_dim: nn.Linear(embedding_dim, output_dim)
+        base = lambda input_dim: nn.Linear(embedding_dim, input_dim)
         self.detokenizers = torch.nn.ModuleDict()
+
         if global_input:
             self.detokenizers['global'] = base(action_dim)
             if output_activation is not None:
@@ -98,41 +110,34 @@ class detokenizer(nn.Module):
                 self.detokenizers[key] = base(len(self.map[key][1]))
                 if output_activation is not None:
                     self.detokenizers[key] = nn.Sequential(self.detokenizers[key], output_activation)
-    
-    def forward(self, x, weights=None):
-        """
-        Forward pass of the detokenizer module.
-        
-        Args:
-            x (torch.Tensor): Tokens to be detokenized.
-            weights (torch.Tensor, optional): Weights for weighted sum. Defaults to None.
-        
-        Returns:
-            torch.Tensor: Detokenized output.
-        """
-        if 'global' in self.detokenizers:
-            output = self.detokenizers['global'](x.to(self.device))
-        else:
-            action = torch.zeros(x.shape[0], self.action_dim).to(self.device)
-            for i, key in enumerate(self.map.keys()):
-                current_action = self.detokenizers[key](x[:, i, :])
-                action[:, self.map[key][1]] = current_action
-            output = action
-        # Reshape back to `[batch, horizon, state_dim]`
-        return einops.rearrange(output, 'b (h d) -> b h d', h=1)
 
-    def weighted_sum(self, x, weights):
+    def forward(self, x):
         """
-        Compute the weighted sum of the input tensor.
+        Forward pass of the detokenizer.
         
         Args:
-            x (torch.Tensor): Input tensor.
-            weights (torch.Tensor): Weights for the sum.
+            x (torch.Tensor): Tokens with shape `(batch_size, time_steps, nbodies, token_dim)`.
         
         Returns:
-            torch.Tensor: Weighted sum of the input tensor.
+            torch.Tensor: Reconstructed output of shape `(batch_size, time_steps, state_dim)`.
         """
-        return torch.sum(x * weights.unsqueeze(-1), dim=1)
+        batch_size, time_steps, nbodies, token_dim = x.shape  # Expected shape: (32, 64, 1, 36)
+        
+        # Initialize reconstructed action with correct shape (batch_size, time_steps, state_dim)
+        action = torch.zeros(batch_size, time_steps, self.action_dim, device=self.device)  # Shape: (32, 64, 4)
+
+        for i, key in enumerate(self.map.keys()):
+            current_action = self.detokenizers[key](x[:, :, i, :])  # Shape: (batch_size, time_steps, mapped_dim)
+            
+            # Ensure correct shape before assignment
+            if current_action.dim() == 3 and current_action.shape[2] == 1:
+                current_action = current_action.squeeze(-1)  # Remove singleton dim if present
+            
+            # Assign decoded values to the appropriate indices
+            action[:, :, self.map[key][1]] = current_action  # Assign to state_dim positions
+
+        # 🚀 ✅ Final shape should be `(batch_size, time_steps, state_dim)`
+        return action
 
 
 class Transformer(nn.Module):
@@ -200,7 +205,7 @@ class BodyTransformer(Transformer):
         super().__init__(nbodies, input_dim, dim_feedforward, nhead, nlayers, use_positional_encoding, device)
         self.mapping = Mapping(env_name)
         shortest_path_matrix = self.mapping.shortest_path_matrix.to(device)
-        adjacency_matrix = shortest_path_matrix < 2
+        adjacency_matrix = (shortest_path_matrix <= 2).float()  #check this at some point #shortest_path_matrix < 2
         
         if random_mask:
             num_nozero = torch.sum(adjacency_matrix) - adjacency_matrix.shape[0]
@@ -219,25 +224,53 @@ class BodyTransformer(Transformer):
         
         self.register_buffer('adjacency_matrix', adjacency_matrix)
         
+        self.time_mlp = TimeEncoder(32, input_dim) # batch_size, time_emb_dim
+        
     def forward(self, x, time, context):
         """
         Forward pass of the BodyTransformer module.
-        
+
         Args:
-            x (torch.Tensor): Input data.
-            time (torch.Tensor): Time information.
-            context (torch.Tensor): Context information.
-        
+            x (torch.Tensor): Input data of shape [batch_size, time_steps, nbodies, token_dim].
+            time (torch.Tensor): Time information of shape [batch_size].
+            context (torch.Tensor or None): Context information, if available.
+
         Returns:
             torch.Tensor: Transformed output.
         """
+        batch_size, time_steps, nbodies, token_dim = x.shape
+
+        # Positional encoding for bodies
         if self.use_positional_encoding:
-            _, nbodies, _ = x.shape
-            limb_indices = torch.arange(0, nbodies).to(x.device)
+            limb_indices = torch.arange(0, nbodies, device=x.device)
             limb_idx_embedding = self.embed_absolute_position(limb_indices)
             x = x + limb_idx_embedding
-        t_emb = self.time_mlp(time)
-        c_emb = self.context_mlp(context)
-        x = x + t_emb + c_emb
-        x = self.encoder(x, mask=~self.adjacency_matrix, is_mixed=self.is_mixed, return_intermediate=False, first_hard_layer=self.first_hard_layer)
+
+        # Time embedding
+        t_emb = self.time_mlp(time)  # Shape: [batch_size, token_dim]
+        t_emb = t_emb.unsqueeze(1).unsqueeze(2)  # Shape: [batch_size, 1, 1, token_dim]
+
+        # Context embedding (optional)
+        if context is not None:
+            c_emb = self.context_mlp(context)  # Shape: [batch_size, token_dim]
+            c_emb = c_emb.unsqueeze(1).expand(-1, time_steps, -1)  # Shape: [batch_size, time_steps, token_dim]
+            x = x + t_emb + c_emb
+        else:
+            x = x + t_emb
+
+        # Flatten time_steps and nbodies into a single dimension
+        x = x.view(batch_size, time_steps * nbodies, token_dim)  # Shape: [batch_size, seq_len, token_dim]
+
+        expanded_adj_matrix = self.adjacency_matrix.repeat(time_steps, time_steps)  # Shape: (time_steps * nbodies, time_steps * nbodies)
+        adjacency_mask = expanded_adj_matrix.unsqueeze(0).expand(batch_size, -1, -1)  # (batch_size, seq_len, seq_len)
+
+        # ✅ FIX: Ensure Transformer mask matches `num_heads`
+        num_heads = self.encoder.layers[0].self_attn.num_heads
+        adjacency_mask = adjacency_mask.repeat(num_heads, 1, 1)
+        mask = (~adjacency_mask.bool()).to(torch.bool)
+        x = self.encoder(x, mask=mask)
+
+        # Reshape back to (batch_size, time_steps, nbodies, token_dim)
+        x = x.view(batch_size, time_steps, nbodies, token_dim)
+
         return x
