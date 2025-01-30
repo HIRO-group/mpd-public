@@ -12,6 +12,7 @@ from torch_robotics.torch_utils.torch_utils import get_torch_device
 # Import BodyNet and BodyTransformer
 from mpd.models.transformer.BodyNet import BodyNet
 from mpd.models.transformer.body_transformer import BodyTransformer
+import wandb
 
 os.environ["HDF5_USE_FILE_LOCKING"] = "FALSE"
 
@@ -31,7 +32,7 @@ def experiment(
     predict_epsilon: bool = True,
 
     # BodyNet
-    embedding_dim: int = 36, # this must be divisible by nhead
+    embedding_dim: int = 36,  # this must be divisible by nhead
     dim_feedforward: int = 256,
     nhead: int = 6,
     nlayers: int = 6,
@@ -53,7 +54,7 @@ def experiment(
     steps_til_summary: int = 10,
     summary_class: str = 'SummaryTrajectoryGeneration',
 
-    steps_til_ckpt: int = 50000,
+    steps_til_ckpt: int = 5000,
 
     ########################################################################
     device: str = 'cuda',
@@ -67,16 +68,17 @@ def experiment(
 
     ########################################################################
     # WandB
-    wandb_mode: str = 'disabled',
-    wandb_entity: str = 'scoreplan',
-    wandb_project: str = 'test_train',
+    wandb_mode: str = 'online',
+    wandb_entity: str = 'briscoe-martinez',
+    wandb_project: str = 'mpd-transformer',
     **kwargs
 ):
     fix_random_seed(seed)
 
     device = get_torch_device(device=device)
-    tensor_args = {'device': device, 'dtype': torch.float32}
+    tensor_args = {'device': device, 'dtype': torch.float32}    
 
+    # breakpoint()
     # Dataset
     train_subset, train_dataloader, val_subset, val_dataloader = get_dataset(
         dataset_class='TrajectoryDataset',
