@@ -1,6 +1,6 @@
 [submodule "deps/experiment_launcher"]
 	path = deps/experiment_launcher
-	url = https://git.ias.informatik.tu-darmstadt.de/common/experiment_launcher.git
+	url = git@github.com:HIRO-group/experiment_launcher.git
 [submodule "deps/motion_planning_baselines"]
 	path = deps/motion_planning_baselines
 	url = git@github.com:HIRO-group/motion_planning_baselines.git
